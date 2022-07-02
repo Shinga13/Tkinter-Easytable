@@ -9,7 +9,7 @@ class Easytable(Frame):
 
     # external functions section
 
-    def border_configure(self, target:str, top_border:int=0, bottom_border:int=0, left_border:int=0, right_border:int=0):
+    def border_configure(self, target:str, top_border:int=None, bottom_border:int=None, left_border:int=None, right_border:int=None):
         """target: one of the following: 
             'heading' (to target the heading),
             'content' (to target the whole content),
@@ -103,7 +103,7 @@ class Easytable(Frame):
     def table_configure(self, height=None):
         """configure the table as a whole
         
-            height: height of the table in lines (including the heading); must be greater than 1
+            height: height of the table in lines (NOT including the heading); must be greater than 1
         """
         if height is not None and height > 1:
             self._set_height(height)
@@ -112,7 +112,7 @@ class Easytable(Frame):
         """add rows to the table. Pass a 1-dimensional list to add a single row. Pass a 2-dimensional list to add multiple rows. 
         The length of the list must be greater than 0. If the list contains more elements per row than there are headings, the excess will be ignored.
         func specifies a function that is run for each list text right before it gets inserted into the table. The only parameter of this needs to be an input for whatevery data your table contains
-        and the return value a string
+        and the return value a string. If, however, this function is specified inside a class, it needs an unused attribute as first parameter.
 
 
         This method may produce unwanted results if the lists' elements to be inserted into the table are not strings.
@@ -152,7 +152,7 @@ class Easytable(Frame):
 
     _default_cell_style = {}
 
-    def __init__(self, master, columns: list = [], heading_style: dict = {}, cell_style: dict = {}, default_cell_style: dict = {}, scrollbar_style:dict = {}, border_color = 'black', **kw):
+    def __init__(self, master, columns: list = [], heading_style: dict = {}, default_cell_style: dict = {}, scrollbar_style:dict = {}, border_color = 'black', **kw):
         Frame.__init__(self, master=master, **kw)
         self._default_cell_style = default_cell_style
         self._init_style(scrollbar_style)
@@ -166,7 +166,7 @@ class Easytable(Frame):
         h_scroll = Scrollbar(self, orient=HORIZONTAL, style='C.Horizontal.TScrollbar')
         
 
-        header = ScrollableFrame(self, orient=HORIZONTAL, scroll_slave=True, ex_h_sb=h_scroll, color=border_color)
+        header = self.__ScrollableFrame(self, orient=HORIZONTAL, scroll_slave=True, ex_h_sb=h_scroll, color=border_color)
         header.pack(side=TOP, fill=X)
         header.pack_propagate(False)
         for i in range(col+1):
@@ -175,7 +175,7 @@ class Easytable(Frame):
         header.sf.rowconfigure(1, weight=0)
         self._scroll_frames['headings'] = header
 
-        content = ScrollableFrame(self, orient=BOTH, scroll_slave=True, ex_h_sb=h_scroll, ex_v_sb=v_scroll, color=border_color)
+        content = self.__ScrollableFrame(self, orient=BOTH, scroll_slave=True, ex_h_sb=h_scroll, ex_v_sb=v_scroll, color=border_color)
         content.pack(side=TOP, fill=X)
         self._scroll_frames['content'] = content
 
@@ -219,16 +219,15 @@ class Easytable(Frame):
         self._set_height(1, True)
 
     def _add_row(self, row_data: list, cell_style: dict = {}, f = None):
-        def r(self, text):
-            return text
-        if f is None:
-            f = r
         row_to_insert = len(self.get_keys(self._cells['rows']))
         frame: Frame = self._scroll_frames['content'].sf
         row = list()
         for i in range(len(self._cells['headings'])-2):
             try:
-                l = Label(frame, text=f(row_data[i]), relief='flat', **cell_style)
+                if f is None:
+                    l = Label(frame, text=row_data[i], relief='flat', **cell_style)
+                else:
+                    l = Label(frame, text=f(row_data[i]), relief='flat', **cell_style)
                 l.grid(row=row_to_insert, column=i, sticky='nsew', ipadx=3, ipady=3)
                 l.bind('<MouseWheel>', self._bind_scroll)
                 row.append(l)
@@ -300,7 +299,7 @@ class Easytable(Frame):
                 self._configure_heading_cell_padding(col, x_borders, y_borders)
 
     def _configure_column_borders(self, col_num, x_borders:tuple = (None,None), y_borders:tuple = (None,None)):
-        for row_num in range(len(self._cells['headings']-2)):
+        for row_num in range(len(self._cells['headings'])-2):
             self._configure_content_cell_padding(row_num, col_num, x_borders, y_borders)
 
     def _configure_content_borders(self, x_borders:tuple = (None,None), y_borders:tuple = (None,None)):
@@ -351,48 +350,48 @@ class Easytable(Frame):
         return keys
 
 
-class ScrollableFrame(Frame):
-    def __init__(self, container, orient=VERTICAL, scroll_slave=False, ex_h_sb:Scrollbar= None,ex_v_sb:Scrollbar= None, color=None, *args, **kwargs):
-        super().__init__(container, *args, **kwargs)
-        self.canvas = Canvas(self, relief='flat')
-        if not scroll_slave:
-            if orient == VERTICAL: scroll_command = self.canvas.yview
-            elif orient == HORIZONTAL: scroll_command = self.canvas.xview
-            self.scrollbar = Scrollbar(self, orient=orient, command=scroll_command)
-        self.sf = Frame(self.canvas, background=color)
+    class __ScrollableFrame(Frame):
+        def __init__(self, container, orient=VERTICAL, scroll_slave=False, ex_h_sb:Scrollbar= None,ex_v_sb:Scrollbar= None, color=None, *args, **kwargs):
+            super().__init__(container, *args, **kwargs)
+            self.canvas = Canvas(self, relief='flat')
+            if not scroll_slave:
+                if orient == VERTICAL: scroll_command = self.canvas.yview
+                elif orient == HORIZONTAL: scroll_command = self.canvas.xview
+                self.scrollbar = Scrollbar(self, orient=orient, command=scroll_command)
+            self.sf = Frame(self.canvas, background=color)
 
-        self.sf.bind(
-            "<Configure>",
-            lambda e: self.__adjust_scrollregion()
-        )
+            self.sf.bind(
+                "<Configure>",
+                lambda e: self.__adjust_scrollregion()
+            )
 
 
-        self.canvas.create_window((-1, -1), window=self.sf, anchor="nw")
+            self.canvas.create_window((-1, -1), window=self.sf, anchor="nw")
 
-        if not scroll_slave:
-            if orient == VERTICAL:
-                self.canvas.configure(yscrollcommand=self.scrollbar.set)
-                direc = Y
-                pack_side = LEFT
-            elif orient == HORIZONTAL:
-                self.canvas.configure(xscrollcommand=self.scrollbar.set)
-                direc = X
-                pack_side = TOP
-            self.canvas.pack(side=pack_side, fill="both", expand=True, anchor='nw')
-        else:
-            if orient == VERTICAL:
-                self.canvas.configure(yscrollcommand=ex_v_sb.set)
-            elif orient == HORIZONTAL:
-                self.canvas.configure(xscrollcommand=ex_h_sb.set)
-            elif orient == BOTH:
-                self.canvas.configure(yscrollcommand=ex_v_sb.set)
-                self.canvas.configure(xscrollcommand=ex_h_sb.set)
-            self.canvas.pack(side=LEFT, fill="both", expand=True, anchor='nw')
+            if not scroll_slave:
+                if orient == VERTICAL:
+                    self.canvas.configure(yscrollcommand=self.scrollbar.set)
+                    direc = Y
+                    pack_side = LEFT
+                elif orient == HORIZONTAL:
+                    self.canvas.configure(xscrollcommand=self.scrollbar.set)
+                    direc = X
+                    pack_side = TOP
+                self.canvas.pack(side=pack_side, fill="both", expand=True, anchor='nw')
+            else:
+                if orient == VERTICAL:
+                    self.canvas.configure(yscrollcommand=ex_v_sb.set)
+                elif orient == HORIZONTAL:
+                    self.canvas.configure(xscrollcommand=ex_h_sb.set)
+                elif orient == BOTH:
+                    self.canvas.configure(yscrollcommand=ex_v_sb.set)
+                    self.canvas.configure(xscrollcommand=ex_h_sb.set)
+                self.canvas.pack(side=LEFT, fill="both", expand=True, anchor='nw')
 
-        if not scroll_slave:
-            self.scrollbar.pack(side=pack_side, fill=direc)
+            if not scroll_slave:
+                self.scrollbar.pack(side=pack_side, fill=direc)
 
-    def __adjust_scrollregion(self):
-        scr = self.canvas.bbox('all')
-        scr = (1, 1, scr[2]-2, scr[3]-2)
-        self.canvas.configure(scrollregion=scr)
+        def __adjust_scrollregion(self):
+            scr = self.canvas.bbox('all')
+            scr = (1, 1, scr[2]-2, scr[3]-2)
+            self.canvas.configure(scrollregion=scr)
