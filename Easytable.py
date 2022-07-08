@@ -125,36 +125,36 @@ class Easytable(Frame):
                 self._add_row(row, self._default_cell_style, func)
         else:
             self._add_row(content, self._default_cell_style, func)
+        self._align_column_width()
 
 
     # internal section
 
-    _cells = {
-        'headings':{
-            '_frame': None,
-            '_canvas': None
-        },
-        'rows':{
-            '_frame': None,
-            '_canvas': None
-        }
-    }
-
-    _paddings = {
-        'headings':{},
-        'rows':{}
-    }
-
-    _scroll_frames = {
-        'headings': None,
-        'content': None,
-    }
-
-    _default_cell_style = {}
-
     def __init__(self, master, columns: list = [], heading_style: dict = {}, default_cell_style: dict = {}, scrollbar_style:dict = {}, border_color = 'black', **kw):
         Frame.__init__(self, master=master, **kw)
         self._default_cell_style = default_cell_style
+
+        self._cells = {
+            'headings':{
+                '_frame': None,
+                '_canvas': None
+            },
+            'rows':{
+                '_frame': None,
+                '_canvas': None
+            }
+        }
+
+        self._paddings = {
+            'headings':{},
+            'rows':{}
+        }
+
+        self._scroll_frames = {
+            'headings': None,
+            'content': None,
+        }
+
         self._init_style(scrollbar_style)
         self._init_grid(len(columns), border_color)
         self._init_columns(columns, heading_style)
@@ -176,7 +176,8 @@ class Easytable(Frame):
         self._scroll_frames['headings'] = header
 
         content = self.__ScrollableFrame(self, orient=BOTH, scroll_slave=True, ex_h_sb=h_scroll, ex_v_sb=v_scroll, color=border_color)
-        content.pack(side=TOP, fill=X)
+        content.pack(side=TOP, fill=BOTH, expand=True)
+        content.pack_propagate(False)
         self._scroll_frames['content'] = content
 
         self.scroll_commands = [header.canvas.xview, content.canvas.xview]
@@ -222,7 +223,7 @@ class Easytable(Frame):
         row_to_insert = len(self.get_keys(self._cells['rows']))
         frame: Frame = self._scroll_frames['content'].sf
         row = list()
-        for i in range(len(self._cells['headings'])-2):
+        for i in range(len(self.get_keys(self._cells['headings']))):
             try:
                 if f is None:
                     l = Label(frame, text=row_data[i], relief='flat', **cell_style)
@@ -231,12 +232,12 @@ class Easytable(Frame):
                 l.grid(row=row_to_insert, column=i, sticky='nsew', ipadx=3, ipady=3)
                 l.bind('<MouseWheel>', self._bind_scroll)
                 row.append(l)
-            except IndexError:
+            except IndexError as e:
                 break 
         self._cells['rows'][row_to_insert] = row
         self._paddings['rows'][row_to_insert] = [(0, 0, 0, 0) for j in range(len(row))]
 
-        self._align_column_width()
+        #self._align_column_width()
 
     def _configure_row_cells(self, row_id: int, cell_style: dict = {}, heading = False):
         if row_id < 0 or len(cell_style) < 1:
@@ -288,7 +289,7 @@ class Easytable(Frame):
         padding = self._merge_padding(self._paddings['headings'][col], (x_padding[0], x_padding[1], y_padding[0], y_padding[1]))
         self._paddings['headings'][col] = padding
         cell : Label = self._cells['headings'][col]
-        cell.grid_configure(padx=x_padding, pady=y_padding)
+        cell.grid_configure( padx=(padding[0], padding[1]), pady=(padding[2], padding[3]) )
 
     def _configure_row_borders(self, row_num, x_borders:tuple = (None,None), y_borders:tuple = (None,None), heading=False):
         if not heading:
@@ -313,17 +314,29 @@ class Easytable(Frame):
         if len(rows) < 1:
             return
         max_width = [0 for i in range(len(header_columns))]
-        for row in rows:
+        """for row in rows:
             for i, cell in enumerate(self._cells['rows'][row]):
                 cell.update()
                 if (cell.winfo_width() + sum(self._paddings['rows'][row][i][:2])) > max_width[i]:
-                    max_width[i] = cell.winfo_width() + sum(self._paddings['rows'][row][i][:2])
-        for col in header_columns:
+                    max_width[i] = cell.winfo_width() + sum(self._paddings['rows'][row][i][:2])"""
+        """for col in header_columns:
             self._cells['headings'][col].update()
             if (self._cells['headings'][col].winfo_width() + sum(self._paddings['headings'][col][:2])) > max_width[col]:
                 self._scroll_frames['content'].sf.grid_columnconfigure(col, minsize=(self._cells['headings'][col].winfo_width() + sum(self._paddings['headings'][col][:2])))
             else:
-                self._scroll_frames['headings'].sf.grid_columnconfigure(col, minsize=max_width[col])
+                self._scroll_frames['headings'].sf.grid_columnconfigure(col, minsize=max_width[col])"""
+        for col in header_columns:
+            self._cells['headings'][col].update()
+            self._cells['rows'][0][col].update()
+            head_width = self._cells['headings'][col].winfo_width()
+            head_pad_width = sum(self._paddings['headings'][col][:2])
+            row_width = self._cells['rows'][0][col].winfo_width()
+            row_pad_width = sum(self._paddings['rows'][0][col][:2])
+            if head_width+head_pad_width > row_width+row_pad_width:
+                self._scroll_frames['content'].sf.grid_columnconfigure(col, minsize=(head_width+head_pad_width))
+            else:
+                self._scroll_frames['headings'].sf.grid_columnconfigure(col, minsize=(row_width+row_pad_width))
+            
 
     def _bind_scroll(self, event):
         if system() == 'Darwin':
