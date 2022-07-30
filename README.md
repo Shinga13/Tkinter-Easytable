@@ -1,3 +1,5 @@
+# !!! This project has been cancelled du to severe perfomance inadequacy !!!
+
 # Tkinter-Easytable
 This python class serves as table display module for the GUI-Interface Tkinter. Tkinter itself does not contain such a module; possibly the closest module functionality-wise is 
 the tkk.Treeview module. This on the other side is bulky and user-unfriendly not mentioning that it's purpose is not to display tables but hierachical structures such as
